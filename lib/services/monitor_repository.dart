@@ -46,6 +46,19 @@ class MonitorRepository {
 
   Stream<List<MonitorRow>> watchAllMonitors() => _db.watchAllMonitors();
 
+  /// Deletes cached monitors (and their history/notification rows) for any
+  /// accountId in the cache that isn't in [validAccountIds] — e.g. an
+  /// account whose secure-storage entry is gone (keyring cleared/reset)
+  /// but whose synced monitors are still sitting in the drift cache.
+  Future<void> pruneOrphanedAccounts(Set<String> validAccountIds) async {
+    final cachedAccountIds = await _db.distinctMonitorAccountIds();
+    for (final accountId in cachedAccountIds) {
+      if (!validAccountIds.contains(accountId)) {
+        await _db.removeAccountData(accountId);
+      }
+    }
+  }
+
   /// Fetches monitors for every account and upserts them into the cache.
   /// Returns per-account outcomes so the UI can surface partial failures.
   Future<List<AccountSyncResult>> syncAll(List<Account> accounts) async {

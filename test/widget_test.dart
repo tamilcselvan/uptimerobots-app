@@ -1,7 +1,9 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:uptimerobots_app/database/app_database.dart';
 import 'package:uptimerobots_app/main.dart';
 import 'package:uptimerobots_app/providers/account_providers.dart';
 import 'package:uptimerobots_app/providers/monitor_providers.dart';
@@ -17,6 +19,9 @@ import 'package:uptimerobots_app/services/settings_repository.dart';
 _testOverrides() => [
       accountRepositoryProvider.overrideWithValue(
         AccountRepository(storage: InMemoryKeyValueStore()),
+      ),
+      appDatabaseProvider.overrideWith(
+        (ref) => AppDatabase.forTesting(NativeDatabase.memory()),
       ),
       allMonitorsProvider.overrideWith((ref) => Stream.value(const [])),
       settingsProvider.overrideWith(() => _FakeSettingsNotifier()),

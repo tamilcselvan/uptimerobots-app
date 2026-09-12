@@ -6,6 +6,7 @@ import '../models/account_summary.dart';
 import '../services/account_repository.dart';
 import '../services/rate_limiter.dart';
 import '../services/uptimerobot_api_client.dart';
+import 'monitor_providers.dart';
 
 final accountRepositoryProvider = Provider<AccountRepository>(
   (ref) => AccountRepository(),
@@ -17,12 +18,22 @@ class AccountsNotifier extends AsyncNotifier<List<Account>> {
 
   @override
   Future<List<Account>> build() async {
+    List<Account> accounts;
     try {
-      return await _repo.loadAll();
+      accounts = await _repo.loadAll();
     } catch (_) {
       // Secure storage channel unavailable (e.g. test harness) — start empty.
-      return [];
+      accounts = [];
     }
+    try {
+      await ref
+          .read(monitorRepositoryProvider)
+          .pruneOrphanedAccounts(accounts.map((a) => a.id).toSet());
+    } catch (_) {
+      // Cache cleanup is best-effort; a failure here shouldn't block
+      // showing the accounts that did load.
+    }
+    return accounts;
   }
 
   /// Validates the api_key against UptimeRobot before saving.

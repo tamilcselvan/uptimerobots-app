@@ -38,6 +38,7 @@ class UptimeRobotsApp extends ConsumerWidget {
 
     return MaterialApp(
       title: 'UptimeRobots',
+      debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

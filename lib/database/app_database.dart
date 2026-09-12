@@ -224,6 +224,16 @@ class AppDatabase extends _$AppDatabase {
     );
   }
 
+  Future<Set<String>> distinctMonitorAccountIds() async {
+    final rows =
+        await (selectOnly(monitors)
+              ..addColumns([monitors.accountId])
+              ..groupBy([monitors.accountId]))
+            .map((row) => row.read(monitors.accountId)!)
+            .get();
+    return rows.toSet();
+  }
+
   Future<void> removeAccountData(String accountId) async {
     await transaction(() async {
       final ids =
