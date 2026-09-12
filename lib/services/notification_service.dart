@@ -22,9 +22,9 @@ class NotificationService {
   static const _sslChannelId = 'monitor_ssl_expiry';
   static const _sslChannelName = 'SSL certificate expiry';
 
-  final FlutterLocalNotificationsPlugin _plugin =
+  static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
-  bool _initialized = false;
+  static bool _initialized = false;
 
   Future<void> init() async {
     if (_initialized) return;

@@ -23,7 +23,7 @@ final allMonitorsProvider = StreamProvider<List<MonitorRow>>((ref) {
 /// Re-fetches whenever a sync updates the cache (via the [allMonitorsProvider]
 /// dependency), so the detail screen stays live while it's open.
 final monitorHistoryProvider =
-    FutureProvider.family<List<StatusHistoryEntry>, String>((
+    FutureProvider.autoDispose.family<List<StatusHistoryEntry>, String>((
       ref,
       monitorId,
     ) async {
@@ -33,7 +33,7 @@ final monitorHistoryProvider =
 
 /// Recent notifications sent for one monitor, newest first.
 final monitorNotificationsProvider =
-    FutureProvider.family<List<NotificationLogEntry>, String>((
+    FutureProvider.autoDispose.family<List<NotificationLogEntry>, String>((
       ref,
       monitorId,
     ) async {

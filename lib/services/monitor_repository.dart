@@ -137,8 +137,9 @@ class MonitorRepository {
       _db.pruneHistoryOlderThan(age);
 
   Future<AccountSyncResult> _syncOne(Account account) async {
+    final client = UptimeRobotApiClient(account.apiKey);
     try {
-      final monitors = await UptimeRobotApiClient(account.apiKey).getMonitors();
+      final monitors = await client.getMonitors();
       final existingRows = {
         for (final row in await _db.monitorsForAccount(account.id)) row.id: row,
       };
@@ -184,6 +185,8 @@ class MonitorRepository {
       return AccountSyncResult(account: account);
     } catch (e) {
       return AccountSyncResult(account: account, error: e);
+    } finally {
+      client.close();
     }
   }
 

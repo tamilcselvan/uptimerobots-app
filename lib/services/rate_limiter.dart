@@ -24,6 +24,10 @@ class RateLimiter {
   factory RateLimiter.forApiKey(String apiKey) =>
       _perKey.putIfAbsent(apiKey, RateLimiter.new);
 
+  /// Frees limiter for [apiKey] when account removed — prevents static
+  /// map growing unbounded across add/remove cycles.
+  static void removeForApiKey(String apiKey) => _perKey.remove(apiKey);
+
   Future<T> run<T>(Future<T> Function() call) async {
     await _waitForSlot();
 

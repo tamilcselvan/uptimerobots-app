@@ -14,6 +14,8 @@ class UptimeRobotApiClient {
   final Dio _dio;
   final RateLimiter _rateLimiter;
 
+  final bool _ownsDio;
+
   UptimeRobotApiClient(this.apiKey, {Dio? dio})
     : _dio =
           dio ??
@@ -25,7 +27,14 @@ class UptimeRobotApiClient {
               receiveTimeout: const Duration(seconds: 15),
             ),
           ),
+      _ownsDio = dio == null,
       _rateLimiter = RateLimiter.forApiKey(apiKey);
+
+  /// Closes underlying [Dio] HttpClient if owned. Call when done if
+  /// client was created without injected [dio].
+  void close() {
+    if (_ownsDio) _dio.close(force: true);
+  }
 
   Future<Map<String, dynamic>> _post(
     String path, [

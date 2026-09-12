@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../models/account.dart';
 import '../models/account_summary.dart';
 import '../services/account_repository.dart';
+import '../services/rate_limiter.dart';
 import '../services/uptimerobot_api_client.dart';
 
 final accountRepositoryProvider = Provider<AccountRepository>(
@@ -30,7 +31,12 @@ class AccountsNotifier extends AsyncNotifier<List<Account>> {
     required String label,
     required String apiKey,
   }) async {
-    await UptimeRobotApiClient(apiKey).getAccountDetails();
+    final client = UptimeRobotApiClient(apiKey);
+    try {
+      await client.getAccountDetails();
+    } finally {
+      client.close();
+    }
     final account = Account(
       id: const Uuid().v4(),
       label: label,
@@ -41,7 +47,14 @@ class AccountsNotifier extends AsyncNotifier<List<Account>> {
   }
 
   Future<void> removeAccount(String id) async {
+    final removed = (state.value ?? []).firstWhere(
+      (a) => a.id == id,
+      orElse: () => Account(id: id, label: '', apiKey: ''),
+    );
     await _repo.remove(id);
+    if (removed.apiKey.isNotEmpty) {
+      RateLimiter.removeForApiKey(removed.apiKey);
+    }
     state = AsyncData((state.value ?? []).where((a) => a.id != id).toList());
   }
 
@@ -112,9 +125,9 @@ final accountsProvider = AsyncNotifierProvider<AccountsNotifier, List<Account>>(
 );
 
 /// Per-account live summary (up/down/paused counts), fetched on demand.
-final accountSummaryProvider = FutureProvider.family<AccountSummary, Account>((
-  ref,
-  account,
-) {
-  return UptimeRobotApiClient(account.apiKey).getAccountDetails();
-});
+final accountSummaryProvider =
+    FutureProvider.autoDispose.family<AccountSummary, Account>((ref, account) {
+      final client = UptimeRobotApiClient(account.apiKey);
+      ref.onDispose(client.close);
+      return client.getAccountDetails();
+    });

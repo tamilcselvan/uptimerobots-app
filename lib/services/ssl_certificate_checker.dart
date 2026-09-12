@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 
 class SslCheckResult {
@@ -49,7 +48,7 @@ class SslCertificateChecker {
     } catch (e) {
       return SslCheckResult(error: e.toString());
     } finally {
-      unawaited(socket?.close());
+      await socket?.close();
     }
 
     if (certificate == null) {
