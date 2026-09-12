@@ -201,6 +201,7 @@ class AppDatabase extends _$AppDatabase {
     return (select(monitors)..where(
           (m) =>
               m.type.equals(1) &
+              m.status.equals(0).not() &
               m.url.like('https://%') &
               (m.sslLastCheckedAt.isNull() |
                   m.sslLastCheckedAt.isSmallerThanValue(cutoff)),
