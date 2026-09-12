@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database/app_database.dart';
 import '../models/account.dart';
 import '../models/monitor.dart';
+import '../providers/monitor_providers.dart';
 import '../screens/monitor_detail_screen.dart';
 import '../theme/app_theme.dart';
 import '../theme/status_style.dart';
 import 'accent_panel.dart';
 
-class MonitorTile extends StatelessWidget {
+class MonitorTile extends ConsumerWidget {
   final MonitorRow monitor;
   final Account? account;
 
   const MonitorTile({super.key, required this.monitor, required this.account});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final style = StatusStyle.of(
       context,
       monitorStatusFromCode(monitor.status),
@@ -89,7 +92,7 @@ class MonitorTile extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '${monitor.responseTimeMs} ms',
+                monitor.responseTimeMs == 0 ? '—' : '${monitor.responseTimeMs} ms',
                 style: appMonoStyle(
                   context,
                   fontSize: 11,
@@ -97,7 +100,40 @@ class MonitorTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
-              _AccountTag(label: account?.label ?? 'Unknown'),
+              Tooltip(
+                message: account?.label ?? 'Unknown',
+                child: _AccountTag(label: account?.label ?? 'Unknown'),
+              ),
+            ],
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'More actions',
+            icon: Icon(Icons.more_vert, size: 18, color: colorScheme.onSurfaceVariant),
+            onSelected: (v) async {
+              switch (v) {
+                case 'copy':
+                  await Clipboard.setData(ClipboardData(text: monitor.url));
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('URL copied')),
+                    );
+                  }
+                  break;
+                case 'mute':
+                  await ref.read(monitorRepositoryProvider).setMuted(monitor.id, !monitor.muted);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(monitor.muted ? 'Notifications enabled' : 'Notifications muted')),
+                    );
+                  }
+                  break;
+                case 'open':
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'copy', child: Text('Copy URL')),
+              PopupMenuItem(value: 'mute', child: Text(monitor.muted ? 'Enable notifications' : 'Mute notifications')),
             ],
           ),
         ],

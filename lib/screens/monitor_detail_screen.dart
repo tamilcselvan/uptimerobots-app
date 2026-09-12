@@ -46,9 +46,14 @@ class MonitorDetailScreen extends ConsumerWidget {
                   ? Icons.notifications_off
                   : Icons.notifications_active,
             ),
-            onPressed: () => ref
-                .read(monitorRepositoryProvider)
-                .setMuted(current.id, !current.muted),
+            onPressed: () async {
+              await ref.read(monitorRepositoryProvider).setMuted(current.id, !current.muted);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(current.muted ? 'Notifications enabled' : 'Notifications muted')),
+                );
+              }
+            },
           ),
         ],
       ),
@@ -56,7 +61,7 @@ class MonitorDetailScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _HeroHeader(monitor: current, account: account, status: status),
-          if (current.type == 1 && current.url.startsWith('https://')) ...[
+          if (current.url.startsWith('https://')) ...[
             const SizedBox(height: 12),
             _SslCard(monitor: current),
           ],
@@ -198,7 +203,7 @@ class _HeroHeader extends StatelessWidget {
               ),
               _MetaTag(
                 icon: Icons.speed,
-                label: '${monitor.responseTimeMs} ms',
+                label: monitor.responseTimeMs == 0 ? '—' : '${monitor.responseTimeMs} ms',
               ),
               _MetaTag(
                 icon: Icons.folder_outlined,
@@ -366,6 +371,19 @@ class _ResponseTimeChart extends StatelessWidget {
           getDrawingHorizontalLine: (_) =>
               FlLine(color: colorScheme.outlineVariant, strokeWidth: 1),
         ),
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touched) => touched.map((s) {
+              final idx = s.spotIndex;
+              final h = samples[idx];
+              final dt = h.recordedAt.toLocal().toString().split(' ').first;
+              return LineTooltipItem(
+                '${h.responseTimeMs} ms\n$dt',
+                TextStyle(color: colorScheme.onSurface),
+              );
+            }).toList(),
+          ),
+        ),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(
             sideTitles: SideTitles(showTitles: false),
@@ -373,8 +391,22 @@ class _ResponseTimeChart extends StatelessWidget {
           rightTitles: const AxisTitles(
             sideTitles: SideTitles(showTitles: false),
           ),
-          bottomTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 22,
+              interval: (samples.length / 4).ceilToDouble().clamp(1, 50).toDouble(),
+              getTitlesWidget: (value, meta) {
+                final idx = value.toInt();
+                if (idx < 0 || idx >= samples.length) return const SizedBox.shrink();
+                if (idx % ((samples.length / 3).ceil()) != 0) return const SizedBox.shrink();
+                final d = samples[idx].recordedAt.toLocal();
+                return Text(
+                  '${d.month}/${d.day}',
+                  style: appMonoStyle(context, fontSize: 9, color: colorScheme.onSurfaceVariant),
+                );
+              },
+            ),
           ),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
@@ -426,20 +458,27 @@ class _StatusTimeline extends StatelessWidget {
       borderRadius: BorderRadius.circular(6),
       child: SizedBox(
         height: 28,
-        child: Row(
-          children: history
-              .map(
-                (h) => Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                    color: StatusStyle.of(
-                      context,
-                      monitorStatusFromCode(h.status),
-                    ).color,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: history
+                .map(
+                  (h) => Tooltip(
+                    message:
+                        '${monitorStatusFromCode(h.status).name} • ${h.recordedAt.toLocal().toString().split('.').first} • ${h.responseTimeMs == null ? '—' : '${h.responseTimeMs} ms'}',
+                    child: Container(
+                      width: 6,
+                      height: 28,
+                      margin: const EdgeInsets.symmetric(horizontal: 0.5),
+                      color: StatusStyle.of(
+                        context,
+                        monitorStatusFromCode(h.status),
+                      ).color,
+                    ),
                   ),
-                ),
-              )
-              .toList(growable: false),
+                )
+                .toList(growable: false),
+          ),
         ),
       ),
     );

@@ -10,11 +10,25 @@ import '../theme/status_style.dart';
 import '../widgets/accent_panel.dart';
 import 'add_account_screen.dart';
 
-class AccountsScreen extends ConsumerWidget {
+class AccountsScreen extends ConsumerStatefulWidget {
   const AccountsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccountsScreen> createState() => _AccountsScreenState();
+}
+
+class _AccountsScreenState extends ConsumerState<AccountsScreen> {
+  String _query = '';
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final accountsAsync = ref.watch(accountsProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -60,14 +74,74 @@ class AccountsScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: accounts.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) => _AccountTile(
-              key: ValueKey(accounts[index].id),
-              account: accounts[index],
-            ),
+          final filtered = _query.isEmpty
+              ? accounts
+              : accounts
+                  .where((a) =>
+                      a.label.toLowerCase().contains(_query) ||
+                      a.id.toLowerCase().contains(_query))
+                  .toList();
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search accounts…',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _query.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () => setState(() {
+                              _query = '';
+                              _searchController.clear();
+                            }),
+                          ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                ),
+              ),
+              if (filtered.length != accounts.length)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${filtered.length} of ${accounts.length}',
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No accounts match "$_query"',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        ),
+                      )
+                    : ReorderableListView.builder(
+                        padding: const EdgeInsets.all(12),
+                        itemCount: filtered.length,
+                        // ignore: deprecated_member_use
+                        onReorder: (oldIndex, newIndex) async {
+                          // Visual reorder only; persistence is label-based, keep order stable by label sort
+                          // No-op for now — placeholder for future persistent order
+                        },
+                        itemBuilder: (context, index) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _AccountTile(
+                            key: ValueKey(filtered[index].id),
+                            account: filtered[index],
+                          ),
+                        ),
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -152,14 +226,46 @@ class _AccountTile extends ConsumerWidget {
               ],
             ),
           ),
-          IconButton(
-            tooltip: 'Remove account',
-            icon: const Icon(Icons.delete_outline),
-            onPressed: () => _confirmRemove(context, ref),
+          PopupMenuButton<String>(
+            tooltip: 'Account actions',
+            icon: Icon(Icons.more_vert, size: 18, color: colorScheme.onSurfaceVariant),
+            onSelected: (v) {
+              if (v == 'rename') _renameAccount(context, ref);
+              if (v == 'remove') _confirmRemove(context, ref);
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(value: 'rename', child: Text('Rename')),
+              PopupMenuItem(value: 'remove', child: Text('Remove')),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _renameAccount(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController(text: account.label);
+    final newLabel = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename account'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Label'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (newLabel != null && newLabel.isNotEmpty && newLabel != account.label) {
+      await ref.read(accountsProvider.notifier).renameAccount(account.id, newLabel);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account renamed')));
+      }
+    }
   }
 
   Future<void> _confirmRemove(BuildContext context, WidgetRef ref) async {

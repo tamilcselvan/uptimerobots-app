@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/monitor.dart';
 import '../providers/account_providers.dart';
+import '../providers/monitor_providers.dart';
 import '../services/uptimerobot_api_exception.dart';
 import '../theme/status_style.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AddAccountScreen extends ConsumerStatefulWidget {
   const AddAccountScreen({super.key});
@@ -17,7 +19,7 @@ class _AddAccountScreenState extends ConsumerState<AddAccountScreen> {
   final _formKey = GlobalKey<FormState>();
   final _labelController = TextEditingController();
   final _apiKeyController = TextEditingController();
-  bool _obscureKey = true;
+  bool _obscureKey = false;
   bool _saving = false;
   String? _error;
 
@@ -41,6 +43,9 @@ class _AddAccountScreenState extends ConsumerState<AddAccountScreen> {
             label: _labelController.text.trim(),
             apiKey: _apiKeyController.text.trim(),
           );
+      // Auto-sync after adding so dashboard shows monitors immediately
+      // ignore: unused_result
+      await ref.read(monitorSyncProvider.notifier).syncNow();
       if (mounted) Navigator.of(context).pop();
     } on UptimeRobotApiException catch (e) {
       setState(() => _error = e.message);
@@ -93,8 +98,11 @@ class _AddAccountScreenState extends ConsumerState<AddAccountScreen> {
                     onPressed: () => setState(() => _obscureKey = !_obscureKey),
                   ),
                 ),
-                validator: (v) =>
-                    (v == null || v.trim().isEmpty) ? 'Enter an API key' : null,
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Enter an API key';
+                  if (v.trim().length < 15) return 'API key looks too short';
+                  return null;
+                },
               ),
               const SizedBox(height: 8),
               Row(
@@ -107,12 +115,23 @@ class _AddAccountScreenState extends ConsumerState<AddAccountScreen> {
                   ),
                   const SizedBox(width: 6),
                   Expanded(
-                    child: Text(
-                      'Stored on this device only. Find your key under '
-                      'My Settings → API Settings in UptimeRobot.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
+                    child: GestureDetector(
+                      onTap: () async {
+                        final uri = Uri.parse('https://uptimerobot.com/dashboard#mySettings');
+                        if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      },
+                      child: Text.rich(
+                        TextSpan(
+                          text: 'Stored on this device only. Find your key under ',
+                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                          children: [
+                            TextSpan(
+                              text: 'My Settings → API Settings',
+                              style: TextStyle(color: colorScheme.primary, decoration: TextDecoration.underline),
+                            ),
+                            const TextSpan(text: ' in UptimeRobot. Tap to open.'),
+                          ],
+                        ),
                       ),
                     ),
                   ),

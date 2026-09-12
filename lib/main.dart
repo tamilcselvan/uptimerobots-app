@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'models/monitor.dart';
+import 'providers/monitor_providers.dart';
 import 'providers/settings_providers.dart';
 import 'screens/accounts_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -77,22 +79,72 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final monitorsAsync = ref.watch(allMonitorsProvider);
+    final downCount = monitorsAsync.maybeWhen(
+      data: (list) => list.where((m) {
+        final s = monitorStatusFromCode(m.status);
+        return s == MonitorStatus.down || s == MonitorStatus.seemsDown;
+      }).length,
+      orElse: () => 0,
+    );
+    final syncAsync = ref.watch(monitorSyncProvider);
+    final hasError = (syncAsync.value ?? []).any((r) => !r.succeeded);
     return Scaffold(
-      body: IndexedStack(index: _index, children: _screens),
+      body: Column(
+        children: [
+          if (hasError)
+            Material(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: InkWell(
+                onTap: () => ref.read(monitorSyncProvider.notifier).syncNow(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(Icons.cloud_off, size: 16, color: Theme.of(context).colorScheme.onErrorContainer),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Some accounts failed to sync — showing cached data. Tap to retry.',
+                          style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onErrorContainer),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          Expanded(child: IndexedStack(index: _index, children: _screens)),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
+        onDestinationSelected: (i) {
+          Feedback.forTap(context);
+          setState(() => _index = i);
+        },
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
+            icon: Badge(
+              isLabelVisible: downCount > 0,
+              label: Text('$downCount'),
+              child: const Icon(Icons.dashboard_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: downCount > 0,
+              label: Text('$downCount'),
+              child: const Icon(Icons.dashboard),
+            ),
             label: 'Dashboard',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.manage_accounts_outlined),
+            selectedIcon: Icon(Icons.manage_accounts),
             label: 'Accounts',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings),
             label: 'Settings',
           ),
         ],

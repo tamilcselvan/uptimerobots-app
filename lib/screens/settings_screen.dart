@@ -31,7 +31,10 @@ class SettingsScreen extends ConsumerWidget {
           children: [
             const _SectionHeader('Appearance'),
             const SizedBox(height: 8),
-            _ThemeModeTile(settings: settings),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: _ThemeModeTile(settings: settings),
+            ),
             const SizedBox(height: 28),
             const _SectionHeader('Sync frequency'),
             const SizedBox(height: 8),
@@ -42,18 +45,24 @@ class SettingsScreen extends ConsumerWidget {
                   subtitle: 'How often the dashboard refreshes',
                   value: settings.foregroundInterval,
                   options: const [1, 2, 5, 10, 15, 30],
-                  onChanged: (d) => ref
-                      .read(settingsProvider.notifier)
-                      .updateSettings((s) => s.copyWith(foregroundInterval: d)),
+                  onChanged: (d) async {
+                    await ref.read(settingsProvider.notifier).updateSettings((s) => s.copyWith(foregroundInterval: d));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Foreground interval set to ${d.inMinutes}m')));
+                    }
+                  },
                 ),
                 _IntervalRow(
                   title: 'In the background',
                   subtitle: 'Best-effort — the OS decides exact timing',
                   value: settings.backgroundInterval,
                   options: const [15, 30, 60, 120],
-                  onChanged: (d) => ref
-                      .read(settingsProvider.notifier)
-                      .updateSettings((s) => s.copyWith(backgroundInterval: d)),
+                  onChanged: (d) async {
+                    await ref.read(settingsProvider.notifier).updateSettings((s) => s.copyWith(backgroundInterval: d));
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Background interval set to ${d.inMinutes}m')));
+                    }
+                  },
                 ),
               ],
             ),
@@ -98,6 +107,8 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               ],
             ),
+            const SizedBox(height: 28),
+            _AboutSection(),
           ],
         ),
       ),
@@ -358,6 +369,36 @@ class _ActionRow extends StatelessWidget {
       title: Text(title),
       subtitle: Text(subtitle),
       onTap: onTap,
+    );
+  }
+}
+
+class _AboutSection extends StatelessWidget {
+  const _AboutSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeader('About'),
+        const SizedBox(height: 8),
+        _SettingsGroup(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('UptimeRobots'),
+              subtitle: const Text('Version 1.0.1 • Multi-account UptimeRobot dashboard'),
+              onTap: () => showAboutDialog(
+                context: context,
+                applicationName: 'UptimeRobots',
+                applicationVersion: '1.0.1+2',
+                applicationLegalese: 'Aggregates monitors across multiple UptimeRobot accounts.',
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
