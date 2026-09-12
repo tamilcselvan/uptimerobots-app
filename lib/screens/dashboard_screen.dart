@@ -9,7 +9,9 @@ import '../providers/monitor_providers.dart';
 import '../services/monitor_repository.dart';
 import '../theme/app_theme.dart';
 import '../theme/status_style.dart';
+import '../widgets/animated_count.dart';
 import '../widgets/monitor_tile.dart';
+import '../widgets/reveal.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -264,12 +266,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                           ),
                                     ),
                                   ),
-                                  ...list.map((m) => Padding(
+                                  ...list.asMap().entries.map((e) => Padding(
                                         padding: const EdgeInsets.only(bottom: 8),
-                                        child: MonitorTile(
-                                          key: ValueKey(m.id),
-                                          monitor: m,
-                                          account: accountsById[m.accountId],
+                                        child: Reveal(
+                                          index: e.key,
+                                          child: MonitorTile(
+                                            key: ValueKey(e.value.id),
+                                            monitor: e.value,
+                                            account: accountsById[e.value.accountId],
+                                          ),
                                         ),
                                       )),
                                 ],
@@ -312,10 +317,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   childAspectRatio: 3.2,
                                 ),
                                 itemCount: filtered.length,
-                                itemBuilder: (context, index) => MonitorTile(
-                                  key: ValueKey(filtered[index].id),
-                                  monitor: filtered[index],
-                                  account: accountsById[filtered[index].accountId],
+                                itemBuilder: (context, index) => Reveal(
+                                  index: index,
+                                  child: MonitorTile(
+                                    key: ValueKey(filtered[index].id),
+                                    monitor: filtered[index],
+                                    account: accountsById[filtered[index].accountId],
+                                  ),
                                 ),
                               ),
                             );
@@ -326,10 +334,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                               itemCount: filtered.length,
                               separatorBuilder: (_, _) => const SizedBox(height: 8),
-                              itemBuilder: (context, index) => MonitorTile(
-                                key: ValueKey(filtered[index].id),
-                                monitor: filtered[index],
-                                account: accountsById[filtered[index].accountId],
+                              itemBuilder: (context, index) => Reveal(
+                                index: index,
+                                child: MonitorTile(
+                                  key: ValueKey(filtered[index].id),
+                                  monitor: filtered[index],
+                                  account: accountsById[filtered[index].accountId],
+                                ),
                               ),
                             ),
                           );
@@ -376,8 +387,14 @@ class _SummaryStrip extends StatelessWidget {
         .where((m) => monitorStatusFromCode(m.status) == MonitorStatus.paused)
         .length;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+      ),
       child: Row(
         children: [
           _SummaryStat(
@@ -387,7 +404,7 @@ class _SummaryStrip extends StatelessWidget {
             selected: statusFilter == MonitorStatus.up,
             onTap: () => onTap(MonitorStatus.up),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 28),
           _SummaryStat(
             value: down,
             label: 'Down',
@@ -395,7 +412,7 @@ class _SummaryStrip extends StatelessWidget {
             selected: statusFilter == MonitorStatus.down || statusFilter == MonitorStatus.seemsDown,
             onTap: () => onTap(MonitorStatus.down),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 28),
           _SummaryStat(
             value: paused,
             label: 'Paused',
@@ -428,15 +445,16 @@ class _SummaryStat extends StatelessWidget {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '$value',
+        AnimatedCount(
+          value: value,
           style: appMonoStyle(
             context,
-            fontSize: 22,
+            fontSize: 30,
             fontWeight: FontWeight.w600,
             color: color,
           ),
         ),
+        const SizedBox(height: 2),
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(

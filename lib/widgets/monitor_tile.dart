@@ -30,16 +30,23 @@ class MonitorTile extends ConsumerWidget {
       semanticsLabel: '${monitor.friendlyName}, ${style.label}',
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) =>
-              MonitorDetailScreen(monitor: monitor, account: account),
-        ),
+        _detailRoute(MonitorDetailScreen(monitor: monitor, account: account)),
       ),
       child: Row(
         children: [
           Semantics(
             label: '${style.label} status',
-            child: Icon(style.icon, color: style.color, size: 22),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              transitionBuilder: (child, animation) =>
+                  FadeTransition(opacity: animation, child: ScaleTransition(scale: animation, child: child)),
+              child: Icon(
+                style.icon,
+                key: ValueKey(style.label),
+                color: style.color,
+                size: 22,
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -140,6 +147,27 @@ class MonitorTile extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// Detail push: a quiet scale-and-fade rather than the default full-width
+/// slide, since the destination is a drill-down of the tapped tile, not a
+/// new top-level place.
+Route<T> _detailRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 200),
+    pageBuilder: (_, _, _) => page,
+    transitionsBuilder: (_, animation, _, child) {
+      final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween(begin: 0.98, end: 1.0).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
 /// Small identifying tag — genuinely useful here since the whole app's

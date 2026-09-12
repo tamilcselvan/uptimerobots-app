@@ -8,6 +8,8 @@ import '../providers/monitor_providers.dart';
 import '../theme/app_theme.dart';
 import '../theme/status_style.dart';
 import '../widgets/accent_panel.dart';
+import '../widgets/animated_count.dart';
+import '../widgets/reveal.dart';
 import 'add_account_screen.dart';
 
 class AccountsScreen extends ConsumerStatefulWidget {
@@ -124,19 +126,17 @@ class _AccountsScreenState extends ConsumerState<AccountsScreen> {
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         ),
                       )
-                    : ReorderableListView.builder(
+                    : ListView.builder(
                         padding: const EdgeInsets.all(12),
                         itemCount: filtered.length,
-                        // ignore: deprecated_member_use
-                        onReorder: (oldIndex, newIndex) async {
-                          // Visual reorder only; persistence is label-based, keep order stable by label sort
-                          // No-op for now — placeholder for future persistent order
-                        },
                         itemBuilder: (context, index) => Padding(
                           padding: const EdgeInsets.only(bottom: 8),
-                          child: _AccountTile(
-                            key: ValueKey(filtered[index].id),
-                            account: filtered[index],
+                          child: Reveal(
+                            index: index,
+                            child: _AccountTile(
+                              key: ValueKey(filtered[index].id),
+                              account: filtered[index],
+                            ),
                           ),
                         ),
                       ),
@@ -312,8 +312,8 @@ class _CountBadge extends StatelessWidget {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(
-          '$count',
+        AnimatedCount(
+          value: count,
           style: appMonoStyle(
             context,
             fontSize: 13,

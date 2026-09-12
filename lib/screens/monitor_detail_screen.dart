@@ -9,6 +9,7 @@ import '../providers/monitor_providers.dart';
 import '../theme/app_theme.dart';
 import '../theme/status_style.dart';
 import '../widgets/accent_panel.dart';
+import '../widgets/reveal.dart';
 
 class MonitorDetailScreen extends ConsumerWidget {
   final MonitorRow monitor;
@@ -60,51 +61,78 @@ class MonitorDetailScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _HeroHeader(monitor: current, account: account, status: status),
+          Reveal(
+            index: 0,
+            child: _HeroHeader(monitor: current, account: account, status: status),
+          ),
           if (current.url.startsWith('https://')) ...[
             const SizedBox(height: 12),
-            _SslCard(monitor: current),
+            Reveal(index: 1, child: _SslCard(monitor: current)),
           ],
           const SizedBox(height: 28),
-          _SectionLabel('Response time'),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 180,
-            child: historyAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(
-                child: Text(
-                  "Couldn't load history.\n$err",
-                  textAlign: TextAlign.center,
+          Reveal(
+            index: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel('Response time'),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 180,
+                  child: historyAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (err, _) => Center(
+                      child: Text(
+                        "Couldn't load history.\n$err",
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    data: (history) => _ResponseTimeChart(history: history),
+                  ),
                 ),
-              ),
-              data: (history) => _ResponseTimeChart(history: history),
+              ],
             ),
           ),
           const SizedBox(height: 28),
-          _SectionLabel('Status timeline'),
-          const SizedBox(height: 12),
-          historyAsync.when(
-            loading: () => const SizedBox.shrink(),
-            error: (_, _) => const SizedBox.shrink(),
-            data: (history) => _StatusTimeline(history: history),
+          Reveal(
+            index: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel('Status timeline'),
+                const SizedBox(height: 12),
+                historyAsync.when(
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
+                  data: (history) => _StatusTimeline(history: history),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 28),
-          _SectionLabel('Recent alerts'),
-          const SizedBox(height: 12),
-          notificationsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Text("Couldn't load alerts.\n$err"),
-            data: (notifications) => notifications.isEmpty
-                ? Text(
-                    'No alerts yet — you\'ll see up/down events here.',
-                    style: TextStyle(color: colorScheme.onSurfaceVariant),
-                  )
-                : Column(
-                    children: notifications
-                        .map((n) => _AlertTile(entry: n))
-                        .toList(growable: false),
-                  ),
+          Reveal(
+            index: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel('Recent alerts'),
+                const SizedBox(height: 12),
+                notificationsAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (err, _) => Text("Couldn't load alerts.\n$err"),
+                  data: (notifications) => notifications.isEmpty
+                      ? Text(
+                          'No alerts yet — you\'ll see up/down events here.',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        )
+                      : Column(
+                          children: notifications
+                              .map((n) => _AlertTile(entry: n))
+                              .toList(growable: false),
+                        ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -151,26 +179,42 @@ class _HeroHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(style.icon, color: style.color, size: 22),
-                    const SizedBox(width: 8),
-                    Text(
-                      style.label,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.titleLarge?.copyWith(color: style.color),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween(begin: const Offset(0, 0.15), end: Offset.zero).animate(animation),
+                      child: child,
                     ),
-                  ],
+                  ),
+                  child: Row(
+                    key: ValueKey(style.label),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(style.icon, color: style.color, size: 22),
+                      const SizedBox(width: 8),
+                      Text(
+                        style.label,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.titleLarge?.copyWith(color: style.color),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              Text(
-                '${monitor.allTimeUptimeRatio.toStringAsFixed(2)}%',
-                style: appMonoStyle(
-                  context,
-                  fontSize: 32,
-                  fontWeight: FontWeight.w600,
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: monitor.allTimeUptimeRatio),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeOutCubic,
+                builder: (context, v, _) => Text(
+                  '${v.toStringAsFixed(2)}%',
+                  style: appMonoStyle(
+                    context,
+                    fontSize: 32,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
