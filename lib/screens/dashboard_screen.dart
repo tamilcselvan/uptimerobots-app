@@ -26,6 +26,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(monitorSyncProvider.notifier).syncNow();
     });
   }
@@ -127,6 +128,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     itemCount: filtered.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (context, index) => MonitorTile(
+                      key: ValueKey(filtered[index].id),
                       monitor: filtered[index],
                       account: accountsById[filtered[index].accountId],
                     ),

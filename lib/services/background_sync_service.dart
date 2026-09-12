@@ -28,8 +28,8 @@ void backgroundSyncCallbackDispatcher() {
       );
       await repository.syncAll(accounts);
       return true;
-    } catch (_) {
-      // Let Workmanager retry on the next scheduled run rather than crash-looping.
+    } catch (e, stack) {
+      debugPrint('Background sync failed: $e\n$stack');
       return false;
     } finally {
       await db.close();

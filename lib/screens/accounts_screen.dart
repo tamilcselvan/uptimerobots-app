@@ -64,8 +64,10 @@ class AccountsScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(12),
             itemCount: accounts.length,
             separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) =>
-                _AccountTile(account: accounts[index]),
+            itemBuilder: (context, index) => _AccountTile(
+              key: ValueKey(accounts[index].id),
+              account: accounts[index],
+            ),
           );
         },
       ),
@@ -82,7 +84,7 @@ class AccountsScreen extends ConsumerWidget {
 
 class _AccountTile extends ConsumerWidget {
   final Account account;
-  const _AccountTile({required this.account});
+  const _AccountTile({super.key, required this.account});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

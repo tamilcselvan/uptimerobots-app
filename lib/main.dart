@@ -67,6 +67,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final settings = await ref.read(settingsProvider.future);
+      if (!mounted) return;
       ref
           .read(foregroundSyncSchedulerProvider)
           .start(interval: settings.foregroundInterval);
