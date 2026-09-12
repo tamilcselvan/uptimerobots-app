@@ -35,7 +35,9 @@ class ForegroundSyncScheduler {
   }
 }
 
-final foregroundSyncSchedulerProvider = Provider<ForegroundSyncScheduler>((ref) {
+final foregroundSyncSchedulerProvider = Provider<ForegroundSyncScheduler>((
+  ref,
+) {
   final scheduler = ForegroundSyncScheduler(ref);
   ref.onDispose(scheduler.stop);
   return scheduler;

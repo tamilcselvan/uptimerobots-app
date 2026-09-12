@@ -48,7 +48,7 @@ void main() {
     await tester.tap(find.text('Accounts'));
     await tester.pump();
 
-    expect(find.text('UptimeRobot Accounts'), findsOneWidget);
+    expect(find.text('Accounts'), findsNWidgets(2)); // AppBar title + nav label
     expect(find.textContaining('No accounts yet'), findsOneWidget);
   });
 

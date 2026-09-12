@@ -4,7 +4,12 @@ import '../database/app_database.dart';
 import '../models/account.dart';
 import '../models/monitor.dart';
 import 'notification_service.dart';
+import 'ssl_certificate_checker.dart';
 import 'uptimerobot_api_client.dart';
+
+/// Notify on the tightest (smallest) day-threshold crossed, descending so
+/// we always land on the most urgent applicable bucket.
+const _sslThresholds = [30, 14, 7, 3, 1, 0];
 
 class AccountSyncResult {
   final Account account;
@@ -27,9 +32,14 @@ int _statusBucket(int status) {
 class MonitorRepository {
   final AppDatabase _db;
   final NotificationService _notifications;
+  final SslCertificateChecker _sslChecker;
 
-  MonitorRepository(this._db, {NotificationService? notifications})
-      : _notifications = notifications ?? NotificationService();
+  MonitorRepository(
+    this._db, {
+    NotificationService? notifications,
+    SslCertificateChecker? sslChecker,
+  }) : _notifications = notifications ?? NotificationService(),
+       _sslChecker = sslChecker ?? SslCertificateChecker();
 
   static String compositeId(String accountId, int uptimeRobotMonitorId) =>
       '${accountId}_$uptimeRobotMonitorId';
@@ -46,12 +56,85 @@ class MonitorRepository {
     // Opportunistic retention: sampling every poll (schema v3) means
     // StatusHistory grows unbounded without this.
     await _db.pruneHistoryOlderThan(const Duration(days: 30));
+    await _checkDueSslCertificates(accounts);
     return results;
   }
 
-  Future<void> setMuted(String monitorId, bool muted) => _db.setMuted(monitorId, muted);
+  /// Client-side SSL expiry check — independent of UptimeRobot's API/plan,
+  /// since SSL monitoring there is a paid-tier feature. Only connects to a
+  /// monitor's host directly about once a day (see [AppDatabase.monitorsDueForSslCheck]),
+  /// batched so many HTTPS monitors don't open dozens of sockets at once.
+  Future<void> _checkDueSslCertificates(List<Account> accounts) async {
+    final due = await _db.monitorsDueForSslCheck(const Duration(hours: 24));
+    if (due.isEmpty) return;
 
-  Future<void> pruneHistoryOlderThan(Duration age) => _db.pruneHistoryOlderThan(age);
+    final accountsById = {for (final a in accounts) a.id: a};
+    const batchSize = 4;
+    for (var i = 0; i < due.length; i += batchSize) {
+      final batch = due.skip(i).take(batchSize);
+      await Future.wait(
+        batch.map((m) => _checkOneSsl(m, accountsById[m.accountId])),
+      );
+    }
+  }
+
+  Future<void> _checkOneSsl(MonitorRow monitor, Account? account) async {
+    final result = await _sslChecker.check(monitor.url);
+
+    if (!result.succeeded) {
+      await _db.setSslInfo(
+        monitor.id,
+        error: result.error,
+        notifiedThreshold: monitor.sslLastNotifiedThreshold,
+      );
+      return;
+    }
+
+    final expiryDate = result.expiryDate!;
+    final daysRemaining = expiryDate.difference(DateTime.now()).inDays;
+
+    // A cert renewal (new expiry noticeably later than the last one seen)
+    // resets the countdown so the next approach re-notifies from scratch.
+    var baseline = monitor.sslLastNotifiedThreshold;
+    final prevExpiry = monitor.sslExpiryDate;
+    if (prevExpiry != null &&
+        expiryDate.isAfter(prevExpiry.add(const Duration(days: 1)))) {
+      baseline = null;
+    }
+
+    final crossedCandidates = _sslThresholds.where((t) => daysRemaining <= t);
+    final tightest = crossedCandidates.isEmpty
+        ? null
+        : crossedCandidates.reduce((a, b) => a < b ? a : b);
+    final shouldNotify =
+        tightest != null &&
+        account != null &&
+        !monitor.muted &&
+        (baseline == null || tightest < baseline);
+
+    if (shouldNotify) {
+      await _notifications.notifySslExpiry(
+        notificationId: stableSslNotificationId(monitor.id),
+        accountLabel: account.label,
+        friendlyName: monitor.friendlyName,
+        daysRemaining: daysRemaining,
+        expiryDate: expiryDate,
+      );
+      baseline = tightest;
+    }
+
+    await _db.setSslInfo(
+      monitor.id,
+      expiryDate: expiryDate,
+      notifiedThreshold: baseline,
+    );
+  }
+
+  Future<void> setMuted(String monitorId, bool muted) =>
+      _db.setMuted(monitorId, muted);
+
+  Future<void> pruneHistoryOlderThan(Duration age) =>
+      _db.pruneHistoryOlderThan(age);
 
   Future<AccountSyncResult> _syncOne(Account account) async {
     try {
@@ -78,19 +161,21 @@ class MonitorRepository {
           newStatus: m.status,
         );
 
-        rows.add(MonitorsCompanion.insert(
-          id: id,
-          accountId: account.id,
-          uptimeRobotMonitorId: m.uptimeRobotMonitorId,
-          friendlyName: m.friendlyName,
-          url: m.url,
-          type: m.type,
-          status: m.status,
-          allTimeUptimeRatio: Value(m.allTimeUptimeRatio),
-          responseTimeMs: Value(m.responseTimeMs),
-          lastSyncedAt: now,
-          lastNotifiedStatus: Value(newLastNotified),
-        ));
+        rows.add(
+          MonitorsCompanion.insert(
+            id: id,
+            accountId: account.id,
+            uptimeRobotMonitorId: m.uptimeRobotMonitorId,
+            friendlyName: m.friendlyName,
+            url: m.url,
+            type: m.type,
+            status: m.status,
+            allTimeUptimeRatio: Value(m.allTimeUptimeRatio),
+            responseTimeMs: Value(m.responseTimeMs),
+            lastSyncedAt: now,
+            lastNotifiedStatus: Value(newLastNotified),
+          ),
+        );
       }
 
       await _db.upsertMonitors(rows);
@@ -128,7 +213,9 @@ class MonitorRepository {
     final prevNotified = existing.lastNotifiedStatus;
     final isMuted = existing.muted;
 
-    if (!isMuted && prevNotified != null && _statusBucket(prevNotified) != newBucket) {
+    if (!isMuted &&
+        prevNotified != null &&
+        _statusBucket(prevNotified) != newBucket) {
       final event = newBucket == 1 ? 'down_to_up' : 'up_to_down';
       await _notifications.notifyStatusChange(
         notificationId: stableNotificationId(monitorId),
@@ -143,5 +230,6 @@ class MonitorRepository {
     return newStatus;
   }
 
-  Future<void> removeAccountData(String accountId) => _db.removeAccountData(accountId);
+  Future<void> removeAccountData(String accountId) =>
+      _db.removeAccountData(accountId);
 }

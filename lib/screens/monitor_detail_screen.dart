@@ -6,6 +6,9 @@ import '../database/app_database.dart';
 import '../models/account.dart';
 import '../models/monitor.dart';
 import '../providers/monitor_providers.dart';
+import '../theme/app_theme.dart';
+import '../theme/status_style.dart';
+import '../widgets/accent_panel.dart';
 
 class MonitorDetailScreen extends ConsumerWidget {
   final MonitorRow monitor;
@@ -13,32 +16,36 @@ class MonitorDetailScreen extends ConsumerWidget {
 
   const MonitorDetailScreen({super.key, required this.monitor, this.account});
 
-  Color _statusColor(MonitorStatus status) => switch (status) {
-        MonitorStatus.up => Colors.green,
-        MonitorStatus.down => Colors.red,
-        MonitorStatus.seemsDown => Colors.orange,
-        MonitorStatus.paused => Colors.grey,
-        MonitorStatus.notCheckedYet => Colors.blueGrey,
-      };
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Prefer the live cached row (reflects mute toggles / new sync results
     // while this screen is open); fall back to the snapshot passed in nav.
-    final live = ref.watch(allMonitorsProvider).value?.where((m) => m.id == monitor.id);
+    final live = ref
+        .watch(allMonitorsProvider)
+        .value
+        ?.where((m) => m.id == monitor.id);
     final current = (live != null && live.isNotEmpty) ? live.first : monitor;
 
     final status = monitorStatusFromCode(current.status);
     final historyAsync = ref.watch(monitorHistoryProvider(current.id));
-    final notificationsAsync = ref.watch(monitorNotificationsProvider(current.id));
+    final notificationsAsync = ref.watch(
+      monitorNotificationsProvider(current.id),
+    );
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(current.friendlyName, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
-            tooltip: current.muted ? 'Unmute notifications' : 'Mute notifications',
-            icon: Icon(current.muted ? Icons.notifications_off : Icons.notifications_active),
+            tooltip: current.muted
+                ? 'Turn on notifications'
+                : 'Turn off notifications',
+            icon: Icon(
+              current.muted
+                  ? Icons.notifications_off
+                  : Icons.notifications_active,
+            ),
             onPressed: () => ref
                 .read(monitorRepositoryProvider)
                 .setMuted(current.id, !current.muted),
@@ -48,34 +55,46 @@ class MonitorDetailScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _HeaderCard(monitor: current, account: account, status: status, color: _statusColor(status)),
-          const SizedBox(height: 24),
-          Text('Response time', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          _HeroHeader(monitor: current, account: account, status: status),
+          if (current.type == 1 && current.url.startsWith('https://')) ...[
+            const SizedBox(height: 12),
+            _SslCard(monitor: current),
+          ],
+          const SizedBox(height: 28),
+          _SectionLabel('Response time'),
+          const SizedBox(height: 12),
           SizedBox(
-            height: 200,
+            height: 180,
             child: historyAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Failed to load history: $err')),
+              error: (err, _) => Center(
+                child: Text(
+                  "Couldn't load history.\n$err",
+                  textAlign: TextAlign.center,
+                ),
+              ),
               data: (history) => _ResponseTimeChart(history: history),
             ),
           ),
-          const SizedBox(height: 24),
-          Text('Status timeline', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: 28),
+          _SectionLabel('Status timeline'),
+          const SizedBox(height: 12),
           historyAsync.when(
             loading: () => const SizedBox.shrink(),
             error: (_, _) => const SizedBox.shrink(),
-            data: (history) => _StatusTimeline(history: history, colorOf: _statusColor),
+            data: (history) => _StatusTimeline(history: history),
           ),
-          const SizedBox(height: 24),
-          Text('Recent alerts', style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
+          const SizedBox(height: 28),
+          _SectionLabel('Recent alerts'),
+          const SizedBox(height: 12),
           notificationsAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (err, _) => Text('Failed to load alerts: $err'),
+            error: (err, _) => Text("Couldn't load alerts.\n$err"),
             data: (notifications) => notifications.isEmpty
-                ? const Text('No alerts yet.', style: TextStyle(color: Colors.grey))
+                ? Text(
+                    'No alerts yet — you\'ll see up/down events here.',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  )
                 : Column(
                     children: notifications
                         .map((n) => _AlertTile(entry: n))
@@ -88,69 +107,227 @@ class MonitorDetailScreen extends ConsumerWidget {
   }
 }
 
-class _HeaderCard extends StatelessWidget {
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(text, style: Theme.of(context).textTheme.titleMedium);
+  }
+}
+
+/// Leads with the two facts that matter most on this screen: current state
+/// and the uptime number. Everything else (url, type, account) is
+/// supporting context underneath.
+class _HeroHeader extends StatelessWidget {
   final MonitorRow monitor;
   final Account? account;
   final MonitorStatus status;
-  final Color color;
 
-  const _HeaderCard({
+  const _HeroHeader({
     required this.monitor,
     required this.account,
     required this.status,
-    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(backgroundColor: color, radius: 6),
-                const SizedBox(width: 8),
-                Text(status.name, style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Text(monitorTypeLabel(monitor.type),
-                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
+    final style = StatusStyle.of(context, status);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AccentPanel(
+      accentColor: style.color,
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(style.icon, color: style.color, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      style.label,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleLarge?.copyWith(color: style.color),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '${monitor.allTimeUptimeRatio.toStringAsFixed(2)}%',
+                style: appMonoStyle(
+                  context,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 2),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text(
+              'uptime',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(monitor.url, style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 4),
-            Text(account?.label ?? 'Unknown account',
-                style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 12)),
-            const Divider(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _Stat(label: 'Uptime', value: '${monitor.allTimeUptimeRatio.toStringAsFixed(2)}%'),
-                _Stat(label: 'Response', value: '${monitor.responseTimeMs} ms'),
-              ],
+          ),
+          const Divider(height: 24),
+          Text(
+            monitor.url,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _MetaTag(
+                icon: Icons.dns_outlined,
+                label: monitorTypeLabel(monitor.type),
+              ),
+              _MetaTag(
+                icon: Icons.speed,
+                label: '${monitor.responseTimeMs} ms',
+              ),
+              _MetaTag(
+                icon: Icons.folder_outlined,
+                label: account?.label ?? 'Unknown account',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _Stat extends StatelessWidget {
+class _MetaTag extends StatelessWidget {
+  final IconData icon;
   final String label;
-  final String value;
-  const _Stat({required this.label, required this.value});
+  const _MetaTag({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ],
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SslCard extends StatelessWidget {
+  final MonitorRow monitor;
+  const _SslCard({required this.monitor});
+
+  @override
+  Widget build(BuildContext context) {
+    final error = monitor.sslCheckError;
+    final expiry = monitor.sslExpiryDate;
+    final checkedAt = monitor.sslLastCheckedAt;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    late final Color accentColor;
+    late final IconData icon;
+    late final String title;
+    String? subtitle;
+
+    if (error != null) {
+      accentColor = StatusStyle.of(context, MonitorStatus.seemsDown).color;
+      icon = Icons.warning_amber;
+      title = "SSL check failed";
+      subtitle = error;
+    } else if (expiry == null) {
+      accentColor = colorScheme.onSurfaceVariant;
+      icon = Icons.lock_clock;
+      title = 'SSL certificate not checked yet';
+    } else {
+      final daysRemaining = expiry.difference(DateTime.now()).inDays;
+      accentColor = daysRemaining <= 7
+          ? StatusStyle.of(context, MonitorStatus.down).color
+          : daysRemaining <= 30
+          ? StatusStyle.of(context, MonitorStatus.seemsDown).color
+          : StatusStyle.of(context, MonitorStatus.up).color;
+      icon = Icons.lock;
+      title = daysRemaining <= 0
+          ? 'SSL certificate expired'
+          : 'SSL certificate expires in $daysRemaining day${daysRemaining == 1 ? '' : 's'}';
+      subtitle = 'Valid until ${expiry.toLocal().toString().split(' ').first}';
+    }
+
+    return AccentPanel(
+      accentColor: accentColor,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: accentColor, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: accentColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (subtitle != null)
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (checkedAt != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Last checked ${checkedAt.toLocal().toString().split('.').first}',
+              style: TextStyle(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -162,10 +339,14 @@ class _ResponseTimeChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final samples = history.where((h) => h.responseTimeMs != null).toList();
+    final colorScheme = Theme.of(context).colorScheme;
     if (samples.isEmpty) {
-      return const Center(
-        child: Text('Not enough data yet — check back after a few sync cycles.',
-            textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+      return Center(
+        child: Text(
+          'Not enough data yet — check back after a few sync cycles.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: colorScheme.onSurfaceVariant),
+        ),
       );
     }
 
@@ -174,27 +355,54 @@ class _ResponseTimeChart extends StatelessWidget {
         FlSpot(i.toDouble(), samples[i].responseTimeMs!.toDouble()),
     ];
     final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b);
+    final primary = Theme.of(context).colorScheme.primary;
 
     return LineChart(
       LineChartData(
         minY: 0,
         maxY: maxY <= 0 ? 100 : maxY * 1.2,
-        gridData: const FlGridData(drawVerticalLine: false),
-        titlesData: const FlTitlesData(
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
+        gridData: FlGridData(
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (_) =>
+              FlLine(color: colorScheme.outlineVariant, strokeWidth: 1),
+        ),
+        titlesData: FlTitlesData(
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          bottomTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 40,
+              getTitlesWidget: (value, meta) => Text(
+                value.toInt().toString(),
+                style: appMonoStyle(
+                  context,
+                  fontSize: 10,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
         ),
         borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            color: Colors.teal,
+            color: primary,
             barWidth: 2,
             dotData: const FlDotData(show: false),
-            belowBarData: BarAreaData(show: true, color: Colors.teal.withValues(alpha: 0.15)),
+            belowBarData: BarAreaData(
+              show: true,
+              color: primary.withValues(alpha: 0.12),
+            ),
           ),
         ],
       ),
@@ -204,26 +412,35 @@ class _ResponseTimeChart extends StatelessWidget {
 
 class _StatusTimeline extends StatelessWidget {
   final List<StatusHistoryEntry> history;
-  final Color Function(MonitorStatus) colorOf;
-
-  const _StatusTimeline({required this.history, required this.colorOf});
+  const _StatusTimeline({required this.history});
 
   @override
   Widget build(BuildContext context) {
     if (history.isEmpty) {
-      return const Text('No history yet.', style: TextStyle(color: Colors.grey));
+      return Text(
+        'No history yet.',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      );
     }
-    return SizedBox(
-      height: 32,
-      child: Row(
-        children: history
-            .map((h) => Expanded(
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        height: 28,
+        child: Row(
+          children: history
+              .map(
+                (h) => Expanded(
                   child: Container(
                     margin: const EdgeInsets.symmetric(horizontal: 0.5),
-                    color: colorOf(monitorStatusFromCode(h.status)),
+                    color: StatusStyle.of(
+                      context,
+                      monitorStatusFromCode(h.status),
+                    ).color,
                   ),
-                ))
-            .toList(growable: false),
+                ),
+              )
+              .toList(growable: false),
+        ),
       ),
     );
   }
@@ -236,14 +453,40 @@ class _AlertTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isRecovery = entry.event == 'down_to_up';
-    return ListTile(
-      dense: true,
-      leading: Icon(
-        isRecovery ? Icons.check_circle : Icons.error,
-        color: isRecovery ? Colors.green : Colors.red,
+    final color = StatusStyle.of(
+      context,
+      isRecovery ? MonitorStatus.up : MonitorStatus.down,
+    ).color;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            isRecovery ? Icons.check_circle : Icons.error,
+            color: color,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isRecovery ? 'Recovered' : 'Went down',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  entry.sentAt.toLocal().toString().split('.').first,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      title: Text(isRecovery ? 'Recovered' : 'Went down'),
-      subtitle: Text(entry.sentAt.toLocal().toString()),
     );
   }
 }

@@ -10,13 +10,16 @@ class AccountRepository {
 
   final KeyValueStore _storage;
 
-  AccountRepository({KeyValueStore? storage}) : _storage = storage ?? SecureKeyValueStore();
+  AccountRepository({KeyValueStore? storage})
+    : _storage = storage ?? SecureKeyValueStore();
 
   Future<List<Account>> loadAll() async {
     final raw = await _storage.read(_storageKey);
     if (raw == null || raw.isEmpty) return [];
     final list = jsonDecode(raw) as List<dynamic>;
-    return list.map((e) => Account.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => Account.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> _saveAll(List<Account> accounts) async {

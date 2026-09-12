@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=UptimeRobots
+Comment=Monitor multiple UptimeRobot accounts from one dashboard
+Exec=uptimerobots_app
+Icon=com.agilecyber.uptimerobots_app
+Terminal=false
+Categories=Utility;Network;
+StartupWMClass=com.agilecyber.uptimerobots_app

@@ -10,13 +10,14 @@ abstract class KeyValueStore {
 class SecureKeyValueStore implements KeyValueStore {
   final FlutterSecureStorage _storage;
   SecureKeyValueStore([FlutterSecureStorage? storage])
-      : _storage = storage ?? const FlutterSecureStorage();
+    : _storage = storage ?? const FlutterSecureStorage();
 
   @override
   Future<String?> read(String key) => _storage.read(key: key);
 
   @override
-  Future<void> write(String key, String value) => _storage.write(key: key, value: value);
+  Future<void> write(String key, String value) =>
+      _storage.write(key: key, value: value);
 }
 
 /// In-memory store for widget/unit tests — no platform channel involved.

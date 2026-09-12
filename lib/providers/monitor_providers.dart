@@ -23,17 +23,23 @@ final allMonitorsProvider = StreamProvider<List<MonitorRow>>((ref) {
 /// Re-fetches whenever a sync updates the cache (via the [allMonitorsProvider]
 /// dependency), so the detail screen stays live while it's open.
 final monitorHistoryProvider =
-    FutureProvider.family<List<StatusHistoryEntry>, String>((ref, monitorId) async {
-  ref.watch(allMonitorsProvider);
-  return ref.watch(appDatabaseProvider).historyForMonitor(monitorId);
-});
+    FutureProvider.family<List<StatusHistoryEntry>, String>((
+      ref,
+      monitorId,
+    ) async {
+      ref.watch(allMonitorsProvider);
+      return ref.watch(appDatabaseProvider).historyForMonitor(monitorId);
+    });
 
 /// Recent notifications sent for one monitor, newest first.
 final monitorNotificationsProvider =
-    FutureProvider.family<List<NotificationLogEntry>, String>((ref, monitorId) async {
-  ref.watch(allMonitorsProvider);
-  return ref.watch(appDatabaseProvider).notificationsForMonitor(monitorId);
-});
+    FutureProvider.family<List<NotificationLogEntry>, String>((
+      ref,
+      monitorId,
+    ) async {
+      ref.watch(allMonitorsProvider);
+      return ref.watch(appDatabaseProvider).notificationsForMonitor(monitorId);
+    });
 
 /// Triggers a sync of all accounts against the UptimeRobot API and
 /// reports per-account results (so the UI can flag a bad key without
@@ -56,5 +62,5 @@ class MonitorSyncNotifier extends AsyncNotifier<List<AccountSyncResult>> {
 
 final monitorSyncProvider =
     AsyncNotifierProvider<MonitorSyncNotifier, List<AccountSyncResult>>(
-  MonitorSyncNotifier.new,
-);
+      MonitorSyncNotifier.new,
+    );

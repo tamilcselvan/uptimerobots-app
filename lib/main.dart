@@ -9,6 +9,7 @@ import 'services/background_sync_service.dart';
 import 'services/foreground_sync_scheduler.dart';
 import 'services/notification_service.dart';
 import 'services/settings_repository.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,17 +33,14 @@ class UptimeRobotsApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final themeMode = ref.watch(settingsProvider).value?.themeMode ?? ThemeMode.system;
+    final themeMode =
+        ref.watch(settingsProvider).value?.themeMode ?? ThemeMode.system;
 
     return MaterialApp(
       title: 'UptimeRobots',
       themeMode: themeMode,
-      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
-      darkTheme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
       home: const HomeShell(),
     );
   }
@@ -58,14 +56,20 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
-  static const _screens = [DashboardScreen(), AccountsScreen(), SettingsScreen()];
+  static const _screens = [
+    DashboardScreen(),
+    AccountsScreen(),
+    SettingsScreen(),
+  ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final settings = await ref.read(settingsProvider.future);
-      ref.read(foregroundSyncSchedulerProvider).start(interval: settings.foregroundInterval);
+      ref
+          .read(foregroundSyncSchedulerProvider)
+          .start(interval: settings.foregroundInterval);
     });
   }
 
@@ -77,9 +81,18 @@ class _HomeShellState extends ConsumerState<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Dashboard'),
-          NavigationDestination(icon: Icon(Icons.manage_accounts_outlined), label: 'Accounts'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'Settings'),
+          NavigationDestination(
+            icon: Icon(Icons.dashboard_outlined),
+            label: 'Dashboard',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.manage_accounts_outlined),
+            label: 'Accounts',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            label: 'Settings',
+          ),
         ],
       ),
     );

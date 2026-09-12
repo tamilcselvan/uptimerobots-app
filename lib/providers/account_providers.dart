@@ -6,7 +6,9 @@ import '../models/account_summary.dart';
 import '../services/account_repository.dart';
 import '../services/uptimerobot_api_client.dart';
 
-final accountRepositoryProvider = Provider<AccountRepository>((ref) => AccountRepository());
+final accountRepositoryProvider = Provider<AccountRepository>(
+  (ref) => AccountRepository(),
+);
 
 /// List of saved accounts, persisted to secure storage.
 class AccountsNotifier extends AsyncNotifier<List<Account>> {
@@ -24,9 +26,16 @@ class AccountsNotifier extends AsyncNotifier<List<Account>> {
 
   /// Validates the api_key against UptimeRobot before saving.
   /// Throws UptimeRobotApiException if the key is invalid.
-  Future<void> addAccount({required String label, required String apiKey}) async {
+  Future<void> addAccount({
+    required String label,
+    required String apiKey,
+  }) async {
     await UptimeRobotApiClient(apiKey).getAccountDetails();
-    final account = Account(id: const Uuid().v4(), label: label, apiKey: apiKey);
+    final account = Account(
+      id: const Uuid().v4(),
+      label: label,
+      apiKey: apiKey,
+    );
     await _repo.add(account);
     state = AsyncData([...state.value ?? [], account]);
   }
@@ -50,7 +59,9 @@ class AccountsNotifier extends AsyncNotifier<List<Account>> {
   /// Imports a batch of {label, apiKey} entries, skipping any api_key
   /// already present and validating each new one against UptimeRobot
   /// before saving. Never throws — failures are reported per entry.
-  Future<ImportResult> importAccounts(List<Map<String, dynamic>> entries) async {
+  Future<ImportResult> importAccounts(
+    List<Map<String, dynamic>> entries,
+  ) async {
     final existingKeys = (state.value ?? []).map((a) => a.apiKey).toSet();
     var added = 0;
     var duplicates = 0;
@@ -60,7 +71,9 @@ class AccountsNotifier extends AsyncNotifier<List<Account>> {
       final label = entry['label']?.toString().trim() ?? '';
       final apiKey = entry['apiKey']?.toString().trim() ?? '';
       if (apiKey.isEmpty) {
-        failed.add('${label.isEmpty ? 'unnamed entry' : label}: missing api key');
+        failed.add(
+          '${label.isEmpty ? 'unnamed entry' : label}: missing api key',
+        );
         continue;
       }
       if (existingKeys.contains(apiKey)) {
@@ -68,7 +81,10 @@ class AccountsNotifier extends AsyncNotifier<List<Account>> {
         continue;
       }
       try {
-        await addAccount(label: label.isEmpty ? 'Imported account' : label, apiKey: apiKey);
+        await addAccount(
+          label: label.isEmpty ? 'Imported account' : label,
+          apiKey: apiKey,
+        );
         existingKeys.add(apiKey);
         added++;
       } catch (e) {
@@ -84,13 +100,21 @@ class ImportResult {
   final int added;
   final int duplicates;
   final List<String> failed;
-  const ImportResult({required this.added, required this.duplicates, required this.failed});
+  const ImportResult({
+    required this.added,
+    required this.duplicates,
+    required this.failed,
+  });
 }
 
-final accountsProvider = AsyncNotifierProvider<AccountsNotifier, List<Account>>(AccountsNotifier.new);
+final accountsProvider = AsyncNotifierProvider<AccountsNotifier, List<Account>>(
+  AccountsNotifier.new,
+);
 
 /// Per-account live summary (up/down/paused counts), fetched on demand.
-final accountSummaryProvider =
-    FutureProvider.family<AccountSummary, Account>((ref, account) {
+final accountSummaryProvider = FutureProvider.family<AccountSummary, Account>((
+  ref,
+  account,
+) {
   return UptimeRobotApiClient(account.apiKey).getAccountDetails();
 });

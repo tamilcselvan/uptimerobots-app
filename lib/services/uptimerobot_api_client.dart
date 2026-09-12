@@ -15,26 +15,32 @@ class UptimeRobotApiClient {
   final RateLimiter _rateLimiter;
 
   UptimeRobotApiClient(this.apiKey, {Dio? dio})
-      : _dio = dio ?? Dio(BaseOptions(
-          baseUrl: _baseUrl,
-          contentType: Headers.formUrlEncodedContentType,
-          connectTimeout: const Duration(seconds: 15),
-          receiveTimeout: const Duration(seconds: 15),
-        )),
-        _rateLimiter = RateLimiter.forApiKey(apiKey);
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
+              baseUrl: _baseUrl,
+              contentType: Headers.formUrlEncodedContentType,
+              connectTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 15),
+            ),
+          ),
+      _rateLimiter = RateLimiter.forApiKey(apiKey);
 
-  Future<Map<String, dynamic>> _post(String path, [Map<String, dynamic>? extra]) {
+  Future<Map<String, dynamic>> _post(
+    String path, [
+    Map<String, dynamic>? extra,
+  ]) {
     return _rateLimiter.run(() => _postOnce(path, extra));
   }
 
-  Future<Map<String, dynamic>> _postOnce(String path, Map<String, dynamic>? extra) async {
+  Future<Map<String, dynamic>> _postOnce(
+    String path,
+    Map<String, dynamic>? extra,
+  ) async {
     final response = await _dio.post<Map<String, dynamic>>(
       path,
-      data: {
-        'api_key': apiKey,
-        'format': 'json',
-        ...?extra,
-      },
+      data: {'api_key': apiKey, 'format': 'json', ...?extra},
     );
     final data = response.data;
     if (data == null) {
@@ -42,7 +48,9 @@ class UptimeRobotApiClient {
     }
     if (data['stat'] == 'fail') {
       final error = data['error'] as Map<String, dynamic>?;
-      throw UptimeRobotApiException(error?['message'] as String? ?? 'Unknown UptimeRobot API error');
+      throw UptimeRobotApiException(
+        error?['message'] as String? ?? 'Unknown UptimeRobot API error',
+      );
     }
     return data;
   }

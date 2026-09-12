@@ -1,23 +1,23 @@
 enum MonitorStatus { paused, notCheckedYet, up, seemsDown, down }
 
 MonitorStatus monitorStatusFromCode(int code) => switch (code) {
-      0 => MonitorStatus.paused,
-      1 => MonitorStatus.notCheckedYet,
-      2 => MonitorStatus.up,
-      8 => MonitorStatus.seemsDown,
-      9 => MonitorStatus.down,
-      _ => MonitorStatus.notCheckedYet,
-    };
+  0 => MonitorStatus.paused,
+  1 => MonitorStatus.notCheckedYet,
+  2 => MonitorStatus.up,
+  8 => MonitorStatus.seemsDown,
+  9 => MonitorStatus.down,
+  _ => MonitorStatus.notCheckedYet,
+};
 
 /// UptimeRobot monitor type codes: 1 HTTP(s), 2 keyword, 3 ping, 4 port, 5 heartbeat.
 String monitorTypeLabel(int code) => switch (code) {
-      1 => 'HTTP(s)',
-      2 => 'Keyword',
-      3 => 'Ping',
-      4 => 'Port',
-      5 => 'Heartbeat',
-      _ => 'Unknown',
-    };
+  1 => 'HTTP(s)',
+  2 => 'Keyword',
+  3 => 'Ping',
+  4 => 'Port',
+  5 => 'Heartbeat',
+  _ => 'Unknown',
+};
 
 /// Parsed view of one monitor for a given [accountId], merging the raw
 /// UptimeRobot API payload with the local composite id used for caching.

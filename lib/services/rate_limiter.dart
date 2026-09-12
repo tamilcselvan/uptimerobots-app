@@ -55,7 +55,9 @@ class RateLimiter {
 
   Duration _backoffDelay(int attempt, DioException e) {
     final retryAfterHeader = e.response?.headers.value('retry-after');
-    final retryAfterSeconds = retryAfterHeader != null ? int.tryParse(retryAfterHeader) : null;
+    final retryAfterSeconds = retryAfterHeader != null
+        ? int.tryParse(retryAfterHeader)
+        : null;
     if (retryAfterSeconds != null) {
       return Duration(seconds: retryAfterSeconds);
     }

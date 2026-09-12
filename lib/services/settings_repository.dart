@@ -16,12 +16,11 @@ class AppSettings {
     ThemeMode? themeMode,
     Duration? foregroundInterval,
     Duration? backgroundInterval,
-  }) =>
-      AppSettings(
-        themeMode: themeMode ?? this.themeMode,
-        foregroundInterval: foregroundInterval ?? this.foregroundInterval,
-        backgroundInterval: backgroundInterval ?? this.backgroundInterval,
-      );
+  }) => AppSettings(
+    themeMode: themeMode ?? this.themeMode,
+    foregroundInterval: foregroundInterval ?? this.foregroundInterval,
+    backgroundInterval: backgroundInterval ?? this.backgroundInterval,
+  );
 }
 
 /// Persists user-tunable settings in shared_preferences (non-sensitive,
@@ -51,7 +50,13 @@ class SettingsRepository {
   Future<void> save(AppSettings settings) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_themeModeKey, settings.themeMode.name);
-    await prefs.setInt(_foregroundMinutesKey, settings.foregroundInterval.inMinutes);
-    await prefs.setInt(_backgroundMinutesKey, settings.backgroundInterval.inMinutes);
+    await prefs.setInt(
+      _foregroundMinutesKey,
+      settings.foregroundInterval.inMinutes,
+    );
+    await prefs.setInt(
+      _backgroundMinutesKey,
+      settings.backgroundInterval.inMinutes,
+    );
   }
 }

@@ -22,7 +22,10 @@ void backgroundSyncCallbackDispatcher() {
       final accounts = await AccountRepository().loadAll();
       if (accounts.isEmpty) return true;
 
-      final repository = MonitorRepository(db, notifications: NotificationService());
+      final repository = MonitorRepository(
+        db,
+        notifications: NotificationService(),
+      );
       await repository.syncAll(accounts);
       return true;
     } catch (_) {
@@ -41,7 +44,9 @@ void backgroundSyncCallbackDispatcher() {
 ///
 /// [frequency] is clamped to Android's 15-minute minimum for periodic work
 /// by the platform itself if a shorter value is passed.
-Future<void> registerBackgroundSync({Duration frequency = const Duration(minutes: 15)}) async {
+Future<void> registerBackgroundSync({
+  Duration frequency = const Duration(minutes: 15),
+}) async {
   if (Platform.isWindows) return;
 
   await Workmanager().initialize(backgroundSyncCallbackDispatcher);

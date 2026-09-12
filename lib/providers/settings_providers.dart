@@ -4,7 +4,9 @@ import '../services/background_sync_service.dart';
 import '../services/foreground_sync_scheduler.dart';
 import '../services/settings_repository.dart';
 
-final settingsRepositoryProvider = Provider<SettingsRepository>((ref) => SettingsRepository());
+final settingsRepositoryProvider = Provider<SettingsRepository>(
+  (ref) => SettingsRepository(),
+);
 
 class SettingsNotifier extends AsyncNotifier<AppSettings> {
   SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
@@ -19,7 +21,9 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
     await _repo.save(next);
 
     if (next.foregroundInterval != current.foregroundInterval) {
-      ref.read(foregroundSyncSchedulerProvider).updateInterval(next.foregroundInterval);
+      ref
+          .read(foregroundSyncSchedulerProvider)
+          .updateInterval(next.foregroundInterval);
     }
     if (next.backgroundInterval != current.backgroundInterval) {
       await updateBackgroundSyncFrequency(next.backgroundInterval);
@@ -27,4 +31,6 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 }
 
-final settingsProvider = AsyncNotifierProvider<SettingsNotifier, AppSettings>(SettingsNotifier.new);
+final settingsProvider = AsyncNotifierProvider<SettingsNotifier, AppSettings>(
+  SettingsNotifier.new,
+);
